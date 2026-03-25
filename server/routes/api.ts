@@ -187,7 +187,7 @@ router.post('/generate-video', async (req: Request, res: Response) => {
     const ai = getAI()
     const finalPrompt = prompt || ''
 
-    const useImageInput = mode === 'Frames to Video' || mode === 'References to Video' || mode === 'Ingredients to Video'
+    const useImageInput = mode === 'Frames to Video' || mode === 'References to Video'
     const config: Record<string, unknown> = {
       numberOfVideos: 1,
       resolution,
@@ -197,8 +197,7 @@ router.post('/generate-video', async (req: Request, res: Response) => {
     if (
       resolution === '1080p' ||
       mode === 'Extend Video' ||
-      mode === 'References to Video' ||
-      mode === 'Ingredients to Video'
+      mode === 'References to Video'
     ) {
       config.durationSeconds = 8
     }
@@ -245,32 +244,6 @@ router.post('/generate-video', async (req: Request, res: Response) => {
           image: { imageBytes: styleImage.base64, mimeType: styleImage.mimeType || 'image/png' },
           referenceType: VideoGenerationReferenceType.STYLE,
         })
-      }
-      if (refs.length) {
-        config.referenceImages = refs
-      }
-    } else if (mode === 'Ingredients to Video') {
-      // Combined mode: start frame + end frame + reference images all together
-      if (startFrame?.base64) {
-        payload.image = {
-          imageBytes: startFrame.base64,
-          mimeType: startFrame.mimeType || 'image/png',
-        }
-      }
-      if (endFrame?.base64) {
-        ;(config as Record<string, unknown>).lastFrame = {
-          imageBytes: endFrame.base64,
-          mimeType: endFrame.mimeType || 'image/png',
-        }
-      }
-      const refs: VideoGenerationReferenceImage[] = []
-      if (referenceImages?.length) {
-        for (const img of referenceImages) {
-          refs.push({
-            image: { imageBytes: img.base64, mimeType: img.mimeType || 'image/png' },
-            referenceType: VideoGenerationReferenceType.ASSET,
-          })
-        }
       }
       if (refs.length) {
         config.referenceImages = refs

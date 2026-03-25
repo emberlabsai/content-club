@@ -4,19 +4,16 @@ export const MODE_LABELS: Record<GenerationMode, string> = {
   [GenerationMode.TEXT_TO_VIDEO]: 'Text',
   [GenerationMode.FRAMES_TO_VIDEO]: 'Frames',
   [GenerationMode.REFERENCES_TO_VIDEO]: 'Reference',
-  [GenerationMode.INGREDIENTS]: 'Ingredients',
   [GenerationMode.EXTEND_VIDEO]: 'Extend',
 }
 
 export const MODE_DESCRIPTIONS: Record<GenerationMode, string> = {
   [GenerationMode.TEXT_TO_VIDEO]:
-    'Generate a video purely from a text description. Best for creative concepts with people.',
+    'Generate a video from a text description. Best for creative concepts with people — prompts go directly to VEO.',
   [GenerationMode.FRAMES_TO_VIDEO]:
-    'Animate from a start image to an end image with interpolation. Add a prompt to guide the motion.',
+    'Interpolate between a start and end frame. Add a prompt to guide the motion and transformation.',
   [GenerationMode.REFERENCES_TO_VIDEO]:
-    'Use up to 3 reference images (characters, products, or styles) to guide generation.',
-  [GenerationMode.INGREDIENTS]:
-    'Full control: start frame + end frame + reference images + detailed prompt. All ingredients in one generation. Requires Veo 3.1 Pro.',
+    'Use up to 3 reference images (characters, products, or styles) to guide the generation. Requires Pro model.',
   [GenerationMode.EXTEND_VIDEO]:
     'Extend an existing 720p video by adding 7 seconds to the end.',
 }

@@ -17,7 +17,6 @@ export enum GenerationMode {
   TEXT_TO_VIDEO = 'Text to Video',
   FRAMES_TO_VIDEO = 'Frames to Video',
   REFERENCES_TO_VIDEO = 'References to Video',
-  INGREDIENTS = 'Ingredients to Video',
   EXTEND_VIDEO = 'Extend Video',
 }
 

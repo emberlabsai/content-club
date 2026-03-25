@@ -1,12 +1,11 @@
 import { GenerationMode } from '../../types'
 import { MODE_LABELS } from '../../lib/constants'
-import { BaselineIcon, ImageIcon, PaletteIcon, FilmIcon, LayersIcon } from '../common/Icons'
+import { BaselineIcon, ImageIcon, PaletteIcon, FilmIcon } from '../common/Icons'
 
 const MODE_ICONS: Record<GenerationMode, typeof BaselineIcon> = {
   [GenerationMode.TEXT_TO_VIDEO]: BaselineIcon,
   [GenerationMode.FRAMES_TO_VIDEO]: ImageIcon,
   [GenerationMode.REFERENCES_TO_VIDEO]: PaletteIcon,
-  [GenerationMode.INGREDIENTS]: LayersIcon,
   [GenerationMode.EXTEND_VIDEO]: FilmIcon,
 }
 
@@ -14,7 +13,6 @@ const SELECTABLE_MODES = [
   GenerationMode.TEXT_TO_VIDEO,
   GenerationMode.FRAMES_TO_VIDEO,
   GenerationMode.REFERENCES_TO_VIDEO,
-  GenerationMode.INGREDIENTS,
 ]
 
 interface ModeSelectorProps {
@@ -36,7 +34,7 @@ export default function ModeSelector({ mode, onChange, showExtend }: ModeSelecto
             key={m}
             type="button"
             onClick={() => onChange(m)}
-            className={`flex items-center gap-2 px-3 py-2.5 rounded-md text-xs font-medium transition-all duration-300 ${
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-md text-xs font-medium transition-all duration-300 ${
               isActive
                 ? 'bg-champagne/15 text-champagne border border-champagne/20'
                 : 'text-stone hover:text-ivory hover:bg-white/[0.04] border border-transparent'
