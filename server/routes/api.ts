@@ -294,14 +294,27 @@ Return ONLY the refined prompt text.`,
 
     const videos = operation.response?.generatedVideos
     if (!videos?.length) {
-      console.error('[generate-video] No videos in response. Full response:', JSON.stringify(operation.response, null, 2))
+      const fullResponse = JSON.stringify(operation.response, null, 2)
+      console.error('[generate-video] No videos in response:', fullResponse)
+
+      const responseStr = fullResponse.toLowerCase()
+      if (responseStr.includes('celebrity') || responseStr.includes('likeness')) {
+        throw new Error(
+          'VEO\'s face detection flagged your input images as containing "celebrity likenesses." ' +
+          'This is a known Google false positive — it happens even with AI-generated faces. ' +
+          'Workaround: use Text-to-Video mode instead and describe the person in your prompt. ' +
+          'Image-based modes (Frames/References) trigger this filter on any human face.'
+        )
+      }
+
       const filterInfo = (operation.response as any)?.raiMediaFilteredReasons
         || (operation.response as any)?.filteredReasons
         || (operation.response as any)?.blockReason
       if (filterInfo) {
-        throw new Error(`Video was blocked by content filter: ${JSON.stringify(filterInfo)}. Try adjusting your prompt.`)
+        throw new Error(`Content filter blocked this generation: ${JSON.stringify(filterInfo)}. Try rephrasing your prompt.`)
       }
-      throw new Error('No videos were generated. The content may have been filtered. Try rephrasing your prompt or using different imagery.')
+
+      throw new Error('No videos were generated. The content may have been filtered. Try Text-to-Video mode or rephrase your prompt.')
     }
 
     const videoObj = videos[0].video

@@ -10,7 +10,17 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
 const PORT = parseInt(process.env.PORT || '3001', 10)
 
-const activeSessions = new Set<string>()
+const AUTH_SECRET = process.env.AUTH_PASSWORD || 'contentclub2026'
+
+function createToken(username: string): string {
+  return crypto.createHmac('sha256', AUTH_SECRET).update(username).digest('hex')
+}
+
+function verifyToken(token: string): boolean {
+  const validUser = process.env.AUTH_USERNAME || 'tiffany'
+  const expected = createToken(validUser)
+  return crypto.timingSafeEqual(Buffer.from(token), Buffer.from(expected))
+}
 
 app.use(cors())
 app.use(compression())
@@ -22,8 +32,7 @@ app.post('/api/auth/login', (req, res) => {
   const validPass = process.env.AUTH_PASSWORD || 'contentclub2026'
 
   if (username === validUser && password === validPass) {
-    const token = crypto.randomBytes(32).toString('hex')
-    activeSessions.add(token)
+    const token = createToken(username)
     res.json({ token })
   } else {
     res.status(401).json({ error: 'Invalid credentials' })
@@ -32,7 +41,7 @@ app.post('/api/auth/login', (req, res) => {
 
 app.post('/api/auth/verify', (req, res) => {
   const token = req.headers.authorization?.replace('Bearer ', '')
-  if (token && activeSessions.has(token)) {
+  if (token && verifyToken(token)) {
     res.json({ valid: true })
   } else {
     res.status(401).json({ valid: false })
@@ -46,7 +55,7 @@ function authMiddleware(
 ) {
   if (req.path.startsWith('/api/auth/')) return next()
   const token = req.headers.authorization?.replace('Bearer ', '')
-  if (!token || !activeSessions.has(token)) {
+  if (!token || !verifyToken(token)) {
     res.status(401).json({ error: 'Unauthorized' })
     return
   }
