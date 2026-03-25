@@ -177,21 +177,31 @@ router.post('/generate-video', async (req: Request, res: Response) => {
 
     const ai = getAI()
 
+    const skipRefinement = req.body.skipRefinement
     let finalPrompt = prompt || ''
-    if (finalPrompt && mode !== 'Extend Video') {
+    if (finalPrompt && mode !== 'Extend Video' && !skipRefinement) {
       try {
         const refineRes = await ai.models.generateContent({
           model: 'gemini-2.5-flash',
-          contents: `You are an expert video prompt engineer for Veo 3.1, specializing in high-end fashion content. Enhance this prompt for optimal video generation without changing its meaning. Add camera directions, lighting, and atmosphere details.
+          contents: `You are an expert video prompt engineer for Veo 3.1. Enhance this prompt for optimal video generation.
+
+RULES:
+- Do NOT change the core meaning or subject
+- Add camera movements, lighting, and atmosphere
+- Keep the prompt concise (under 200 words)
+- Do NOT add any content that could trigger safety filters
+- Do NOT mention violence, weapons, or controversial themes
+- Focus on cinematic and artistic quality
 
 Original: "${finalPrompt}"
 
-Return ONLY the refined prompt.`,
+Return ONLY the refined prompt text.`,
           config: { safetySettings: PERMISSIVE_SAFETY },
         })
         finalPrompt = refineRes.text?.trim() || finalPrompt
-      } catch {
-        // Use original prompt if refinement fails
+        console.log('[generate-video] Auto-refined prompt successfully')
+      } catch (refineErr) {
+        console.warn('[generate-video] Auto-refinement failed, using original prompt:', refineErr)
       }
     }
 
@@ -260,24 +270,38 @@ Return ONLY the refined prompt.`,
     }
 
     console.log('[generate-video] Submitting generation request...')
+    console.log('[generate-video] Model:', model, '| Mode:', mode, '| Resolution:', resolution)
+    console.log('[generate-video] Refined prompt:', finalPrompt?.slice(0, 200))
     let operation = await ai.models.generateVideos(payload as any)
 
+    let pollCount = 0
     while (!operation.done) {
       await new Promise((r) => setTimeout(r, 10000))
-      console.log('[generate-video] Polling...')
+      pollCount++
+      console.log(`[generate-video] Polling... (${pollCount * 10}s elapsed)`)
       operation = await ai.operations.getVideosOperation({ operation })
     }
+
+    console.log('[generate-video] Operation complete after', pollCount * 10, 'seconds')
 
     if (operation.error) {
       const errMsg = typeof operation.error === 'object' && operation.error !== null && 'message' in operation.error
         ? String((operation.error as { message?: unknown }).message)
         : 'Video generation failed'
+      console.error('[generate-video] Operation error:', JSON.stringify(operation.error))
       throw new Error(errMsg)
     }
 
     const videos = operation.response?.generatedVideos
     if (!videos?.length) {
-      throw new Error('No videos were generated')
+      console.error('[generate-video] No videos in response. Full response:', JSON.stringify(operation.response, null, 2))
+      const filterInfo = (operation.response as any)?.raiMediaFilteredReasons
+        || (operation.response as any)?.filteredReasons
+        || (operation.response as any)?.blockReason
+      if (filterInfo) {
+        throw new Error(`Video was blocked by content filter: ${JSON.stringify(filterInfo)}. Try adjusting your prompt.`)
+      }
+      throw new Error('No videos were generated. The content may have been filtered. Try rephrasing your prompt or using different imagery.')
     }
 
     const videoObj = videos[0].video
