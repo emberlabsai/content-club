@@ -260,6 +260,7 @@ export default function PromptForm({
             )}
           </div>
           <p className="text-[10px] text-stone/40 italic">At least a start frame is required</p>
+          <p className="text-[10px] text-amber-500/60 italic max-w-sm text-center">Note: VEO may reject images containing human faces (even AI-generated ones) due to Google's celebrity detection filter. Use Text-to-Video for content with people.</p>
           {startFrame && !endFrame && (
             <label className="flex items-center gap-2 cursor-pointer">
               <input
@@ -294,6 +295,7 @@ export default function PromptForm({
               />
             )}
           </div>
+          <p className="text-[10px] text-amber-500/60 italic max-w-sm text-center">Tip: Use product/environment/style references. Images with human faces may be rejected by Google's celebrity filter.</p>
         </div>
       )}
 

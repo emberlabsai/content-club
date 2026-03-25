@@ -205,10 +205,11 @@ Return ONLY the refined prompt text.`,
       }
     }
 
+    const useImageInput = mode === 'Frames to Video' || mode === 'References to Video'
     const config: Record<string, unknown> = {
       numberOfVideos: 1,
       resolution,
-      personGeneration: 'allow_adult',
+      personGeneration: useImageInput ? 'allow_adult' : 'allow_all',
     }
 
     if (
