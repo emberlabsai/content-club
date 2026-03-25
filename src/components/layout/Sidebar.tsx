@@ -4,7 +4,6 @@ import {
   LayoutGridIcon,
   UsersIcon,
   ChatIcon,
-  ImagePlusIcon,
   FolderOpenIcon,
 } from '../common/Icons'
 
@@ -18,8 +17,7 @@ interface SidebarProps {
 
 const navItems: { view: AppView; label: string; icon: typeof ClapperboardIcon }[] = [
   { view: 'studio', label: 'Studio', icon: ClapperboardIcon },
-  { view: 'chat', label: 'Chat', icon: ChatIcon },
-  { view: 'imagine', label: 'Imagine', icon: ImagePlusIcon },
+  { view: 'chat', label: 'Gemini', icon: ChatIcon },
   { view: 'assets', label: 'Assets', icon: FolderOpenIcon },
   { view: 'gallery', label: 'Gallery', icon: LayoutGridIcon },
   { view: 'clients', label: 'Clients', icon: UsersIcon },
@@ -54,13 +52,16 @@ export default function Sidebar({
                 : 'text-stone hover:text-ivory hover:bg-white/[0.04]'
             }`}
           >
+            {isActive && (
+              <div className="absolute left-0 top-2 bottom-2 w-0.5 bg-champagne rounded-r" />
+            )}
             <Icon className="w-[18px] h-[18px]" />
             <span className="text-[7px] uppercase tracking-wider mt-0.5 font-medium">
               {label}
             </span>
             {count > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-champagne/20 text-champagne text-[8px] font-semibold rounded-full flex items-center justify-center">
-                {count}
+              <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 bg-champagne/20 text-champagne text-[8px] font-semibold rounded-full flex items-center justify-center">
+                {count > 99 ? '99+' : count}
               </span>
             )}
           </button>

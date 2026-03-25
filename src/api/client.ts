@@ -1,4 +1,4 @@
-import type { GenerateVideoParams } from '../types'
+import type { GenerateVideoParams, ChatMessagePart } from '../types'
 
 function getToken(): string {
   return localStorage.getItem('tcc-auth-token') || ''
@@ -85,9 +85,9 @@ export async function generateVideo(
 }
 
 export async function chatWithGemini(
-  messages: { role: string; content: string }[],
+  messages: { role: string; content: string; imageData?: { base64: string; mimeType: string } }[],
   model?: string
-): Promise<string> {
+): Promise<ChatMessagePart[]> {
   const res = await fetch('/api/chat', {
     method: 'POST',
     headers: authHeaders(),
@@ -99,24 +99,5 @@ export async function chatWithGemini(
     throw new Error(err.error || 'Chat failed')
   }
   const data = await res.json()
-  return data.response
-}
-
-export async function generateImage(
-  prompt: string,
-  aspectRatio?: string,
-  numberOfImages?: number
-): Promise<{ base64: string; mimeType: string }[]> {
-  const res = await fetch('/api/generate-image', {
-    method: 'POST',
-    headers: authHeaders(),
-    body: JSON.stringify({ prompt, aspectRatio, numberOfImages }),
-  })
-  if (!res.ok) {
-    if (res.status === 401) throw new Error('SESSION_EXPIRED')
-    const err = await res.json().catch(() => ({ error: 'Image generation failed' }))
-    throw new Error(err.error || 'Image generation failed')
-  }
-  const data = await res.json()
-  return data.images
+  return data.parts as ChatMessagePart[]
 }

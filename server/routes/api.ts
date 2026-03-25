@@ -1,6 +1,8 @@
 import { Router, Request, Response } from 'express'
 import {
   GoogleGenAI,
+  HarmCategory,
+  HarmBlockThreshold,
   VideoGenerationReferenceImage,
   VideoGenerationReferenceType,
 } from '@google/genai'
@@ -12,6 +14,24 @@ function getAI(): GoogleGenAI {
   if (!key) throw new Error('GEMINI_API_KEY environment variable is not set')
   return new GoogleGenAI({ apiKey: key })
 }
+
+const PERMISSIVE_SAFETY = [
+  { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+  { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+  { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+  { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+]
+
+const SYSTEM_INSTRUCTION = `You are Tiffany's creative AI assistant inside her private content studio. You specialize in high-end fashion content creation, video production, and luxury brand marketing.
+
+You help with:
+- Crafting compelling video prompts for VEO 3.1 video generation
+- Brainstorming creative concepts for fashion brands like JLUXLABEL
+- Generating and iterating on images for mood boards, lookbooks, and campaigns
+- Advising on visual aesthetics, lighting, camera angles, and styling
+- Content strategy for luxury fashion brands
+
+Be creative, knowledgeable about fashion, and always aim for elevated, editorial quality. Keep responses concise but rich with actionable creative direction. When generating images, focus on high-end fashion aesthetics.`
 
 // ─── Prompt Refinement ───────────────────────────────────────────────
 
@@ -43,6 +63,9 @@ Veo Best Practices:
 Original Prompt: "${prompt}"
 
 Return ONLY the refined prompt text. No explanations, quotes, or conversational text.`,
+      config: {
+        safetySettings: PERMISSIVE_SAFETY,
+      },
     })
 
     res.json({ refined: response.text?.trim() || prompt })
@@ -53,11 +76,11 @@ Return ONLY the refined prompt text. No explanations, quotes, or conversational 
   }
 })
 
-// ─── Gemini Chat ─────────────────────────────────────────────────────
+// ─── Unified Chat (Gemini Pro text + Nano Banana 2 images) ──────────
 
 router.post('/chat', async (req: Request, res: Response) => {
   try {
-    const { messages, model } = req.body
+    const { messages, model, imageAttachments } = req.body
     if (!messages?.length) {
       res.status(400).json({ error: 'Messages are required' })
       return
@@ -65,85 +88,71 @@ router.post('/chat', async (req: Request, res: Response) => {
 
     const ai = getAI()
     const chatModel = model || 'gemini-2.5-flash'
+    const isImageModel = chatModel.includes('image')
 
-    const systemPrompt = `You are Tiffany's creative AI assistant, specializing in high-end fashion content creation, video production, and luxury brand marketing.
-
-You help with:
-- Crafting compelling video prompts for VEO 3.1 video generation
-- Brainstorming creative concepts for fashion brands
-- Writing image generation prompts for Imagen 3
-- Advising on visual aesthetics, lighting, camera angles, and styling
-- Content strategy for luxury fashion brands like JLUXLABEL
-
-Be creative, knowledgeable about fashion, and always aim for elevated, editorial quality. Keep responses concise but rich with actionable creative direction.`
-
-    const formattedContents: any[] = [
-      { role: 'user', parts: [{ text: `[System] ${systemPrompt}` }] },
-      { role: 'model', parts: [{ text: 'Understood. I\'m ready to help you create elevated fashion content. What would you like to work on?' }] },
-    ]
-
+    const formattedContents: any[] = []
     for (const m of messages) {
+      const parts: any[] = []
+      if (m.content) {
+        parts.push({ text: m.content })
+      }
+      if (m.imageData) {
+        parts.push({
+          inlineData: {
+            data: m.imageData.base64,
+            mimeType: m.imageData.mimeType,
+          },
+        })
+      }
       formattedContents.push({
         role: m.role === 'user' ? 'user' : 'model',
-        parts: [{ text: m.content }],
+        parts,
       })
+    }
+
+    const config: any = {
+      systemInstruction: SYSTEM_INSTRUCTION,
+      safetySettings: PERMISSIVE_SAFETY,
+    }
+
+    if (isImageModel) {
+      config.responseModalities = ['Text', 'Image']
+      config.imageConfig = {
+        personGeneration: 'ALLOW_ALL',
+      }
     }
 
     const response = await ai.models.generateContent({
       model: chatModel,
       contents: formattedContents,
+      config,
     })
 
-    res.json({ response: response.text?.trim() || '' })
+    const responseParts: { type: string; content?: string; base64?: string; mimeType?: string }[] = []
+
+    if (response.candidates?.[0]?.content?.parts) {
+      for (const part of response.candidates[0].content.parts) {
+        if (part.text) {
+          responseParts.push({ type: 'text', content: part.text })
+        }
+        if (part.inlineData) {
+          responseParts.push({
+            type: 'image',
+            base64: part.inlineData.data,
+            mimeType: part.inlineData.mimeType || 'image/png',
+          })
+        }
+      }
+    }
+
+    if (responseParts.length === 0 && response.text) {
+      responseParts.push({ type: 'text', content: response.text.trim() })
+    }
+
+    res.json({ parts: responseParts })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Chat failed'
     console.error('[chat]', message)
-    res.status(500).json({ error: message })
-  }
-})
-
-// ─── Image Generation (Imagen 3) ────────────────────────────────────
-
-router.post('/generate-image', async (req: Request, res: Response) => {
-  try {
-    const { prompt, aspectRatio, numberOfImages } = req.body
-    if (!prompt?.trim()) {
-      res.status(400).json({ error: 'Prompt is required' })
-      return
-    }
-
-    const ai = getAI()
-
-    console.log('[generate-image] Generating with Imagen 3...')
-    const response = await ai.models.generateImages({
-      model: 'imagen-3.0-generate-002',
-      prompt,
-      config: {
-        numberOfImages: numberOfImages || 1,
-        aspectRatio: aspectRatio || '16:9',
-      },
-    })
-
-    const images = response.generatedImages
-    if (!images?.length) {
-      throw new Error('No images were generated')
-    }
-
-    const results = images.map((img: any) => {
-      const imageData = img.image
-      if (!imageData?.imageBytes) {
-        throw new Error('Generated image has no data')
-      }
-      return {
-        base64: imageData.imageBytes,
-        mimeType: imageData.mimeType || 'image/png',
-      }
-    })
-
-    res.json({ images: results })
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Image generation failed'
-    console.error('[generate-image]', message)
     res.status(500).json({ error: message })
   }
 })
@@ -178,6 +187,7 @@ router.post('/generate-video', async (req: Request, res: Response) => {
 Original: "${finalPrompt}"
 
 Return ONLY the refined prompt.`,
+          config: { safetySettings: PERMISSIVE_SAFETY },
         })
         finalPrompt = refineRes.text?.trim() || finalPrompt
       } catch {

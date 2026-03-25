@@ -1,20 +1,17 @@
-import { useState } from 'react'
 import type { HistoryItem } from '../../types'
 import VideoCard from './VideoCard'
-import { LayoutGridIcon, UsersIcon, ChevronDownIcon } from '../common/Icons'
+import { LayoutGridIcon } from '../common/Icons'
 
 interface GalleryViewProps {
   history: HistoryItem[]
-  clients: string[]
+  activeClient: string
   onLoadConcept: (item: HistoryItem) => void
 }
 
-export default function GalleryView({ history, clients, onLoadConcept }: GalleryViewProps) {
-  const [clientFilter, setClientFilter] = useState<string>('all')
-
-  const filtered = clientFilter === 'all'
-    ? history
-    : history.filter((h) => h.client === clientFilter)
+export default function GalleryView({ history, activeClient, onLoadConcept }: GalleryViewProps) {
+  const filtered = activeClient
+    ? history.filter((h) => h.client === activeClient)
+    : history
 
   return (
     <div className="p-8 animate-fade-in">
@@ -25,34 +22,22 @@ export default function GalleryView({ history, clients, onLoadConcept }: Gallery
             <h2 className="serif text-2xl font-light tracking-tight text-ivory">Gallery</h2>
           </div>
           <p className="text-xs text-stone/50 ml-8">
-            {filtered.length} production{filtered.length !== 1 ? 's' : ''} in this session
+            {filtered.length} production{filtered.length !== 1 ? 's' : ''}
+            {activeClient && ` for ${activeClient}`}
           </p>
         </div>
-
-        {clients.length > 0 && (
-          <div className="relative">
-            <UsersIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-stone/30" />
-            <select
-              value={clientFilter}
-              onChange={(e) => setClientFilter(e.target.value)}
-              className="bg-white/[0.03] border border-white/[0.06] rounded-lg pl-9 pr-8 py-2 text-xs text-ivory appearance-none hover:border-white/10 transition-all"
-            >
-              <option value="all">All Clients</option>
-              {clients.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-            <ChevronDownIcon className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-stone/30 pointer-events-none" />
-          </div>
-        )}
       </div>
 
       {filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 text-center">
           <span className="text-stone/10 text-6xl mb-6">✦</span>
-          <h3 className="serif text-xl font-light text-ivory/60 mb-2">No Productions Yet</h3>
+          <h3 className="serif text-xl font-light text-ivory/60 mb-2">
+            {activeClient ? `No Productions for ${activeClient}` : 'No Productions Yet'}
+          </h3>
           <p className="text-xs text-stone/40 max-w-sm">
-            Head to the Studio to create your first video. All generations from this session will appear here.
+            {activeClient
+              ? `Switch to "All Clients" to see everything, or head to the Studio to create content for ${activeClient}.`
+              : 'Head to the Studio to create your first video. All generations will appear here.'}
           </p>
         </div>
       ) : (

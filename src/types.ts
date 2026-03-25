@@ -20,7 +20,7 @@ export enum GenerationMode {
   EXTEND_VIDEO = 'Extend Video',
 }
 
-export type AppView = 'studio' | 'gallery' | 'clients' | 'chat' | 'imagine' | 'assets'
+export type AppView = 'studio' | 'gallery' | 'clients' | 'chat' | 'assets'
 
 export interface ImageData {
   base64: string
@@ -62,10 +62,17 @@ export interface ClientProfile {
   createdAt: number
 }
 
+export interface ChatMessagePart {
+  type: 'text' | 'image'
+  content?: string
+  base64?: string
+  mimeType?: string
+}
+
 export interface ChatMessage {
   id: string
   role: 'user' | 'assistant'
-  content: string
+  parts: ChatMessagePart[]
   timestamp: number
 }
 
@@ -77,7 +84,7 @@ export interface AssetItem {
   base64?: string
   mimeType: string
   createdAt: number
-  source: 'generated' | 'uploaded' | 'imagen'
+  source: 'generated' | 'uploaded' | 'nano-banana'
   prompt?: string
   client?: string
 }

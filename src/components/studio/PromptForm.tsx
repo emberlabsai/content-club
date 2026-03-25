@@ -28,6 +28,7 @@ interface PromptFormProps {
   clients: string[]
   initialValues?: GenerateVideoParams | null
   canExtend?: boolean
+  activeClient?: string
 }
 
 function fileToBase64(file: File): Promise<ImageData> {
@@ -115,9 +116,10 @@ export default function PromptForm({
   clients,
   initialValues,
   canExtend,
+  activeClient,
 }: PromptFormProps) {
   const [prompt, setPrompt] = useState(initialValues?.prompt ?? '')
-  const [client, setClient] = useState(initialValues?.client ?? '')
+  const [client, setClient] = useState(initialValues?.client ?? activeClient ?? '')
   const [model, setModel] = useState<VeoModel>(initialValues?.model ?? VeoModel.VEO_FAST)
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>(initialValues?.aspectRatio ?? AspectRatio.LANDSCAPE)
   const [resolution, setResolution] = useState<Resolution>(initialValues?.resolution ?? Resolution.P720)

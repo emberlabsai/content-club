@@ -21,8 +21,8 @@ import VideoResult from './components/studio/VideoResult'
 import GalleryView from './components/gallery/GalleryView'
 import ClientsView from './components/clients/ClientsView'
 import ChatView from './components/chat/ChatView'
-import ImagineView from './components/imagine/ImagineView'
 import AssetsView from './components/assets/AssetsView'
+import Toast, { type ToastMessage } from './components/common/Toast'
 
 type StudioState = 'idle' | 'loading' | 'success' | 'error'
 
@@ -39,12 +39,23 @@ export default function App() {
   const [lastConfig, setLastConfig] = useState<GenerateVideoParams | null>(null)
   const [initialFormValues, setInitialFormValues] = useState<GenerateVideoParams | null>(null)
   const [loadingStartTime, setLoadingStartTime] = useState(0)
+  const [toasts, setToasts] = useState<ToastMessage[]>([])
 
   const [history, setHistory] = useLocalStorage<HistoryItem[]>('tcc-history', [])
   const [clients, setClients] = useLocalStorage<ClientProfile[]>('tcc-clients', [
     { id: 'jluxlabel', name: 'JLUXLABEL', createdAt: Date.now() },
   ])
   const [assets, setAssets] = useLocalStorage<AssetItem[]>('tcc-assets', [])
+  const [activeClient, setActiveClient] = useLocalStorage<string>('tcc-active-client', '')
+
+  const addToast = useCallback((text: string, type?: 'success' | 'error' | 'info') => {
+    const id = crypto.randomUUID()
+    setToasts((prev) => [...prev, { id, text, type }])
+  }, [])
+
+  const dismissToast = useCallback((id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id))
+  }, [])
 
   useEffect(() => {
     const token = localStorage.getItem('tcc-auth-token')
@@ -92,9 +103,7 @@ export default function App() {
       video.muted = true
       video.playsInline = true
       video.crossOrigin = 'anonymous'
-      video.onloadeddata = () => {
-        video.currentTime = 0.5
-      }
+      video.onloadeddata = () => { video.currentTime = 0.5 }
       video.onseeked = () => {
         try {
           const canvas = document.createElement('canvas')
@@ -104,12 +113,8 @@ export default function App() {
           if (ctx) {
             ctx.drawImage(video, 0, 0, 320, 180)
             resolve(canvas.toDataURL('image/jpeg', 0.6))
-          } else {
-            resolve(undefined)
-          }
-        } catch {
-          resolve(undefined)
-        }
+          } else resolve(undefined)
+        } catch { resolve(undefined) }
       }
       video.onerror = () => resolve(undefined)
       setTimeout(() => resolve(undefined), 5000)
@@ -117,14 +122,15 @@ export default function App() {
   }
 
   const handleGenerate = useCallback(async (params: GenerateVideoParams) => {
+    const p = { ...params, client: params.client || activeClient }
     setStudioState('loading')
     setErrorMessage(null)
-    setLastConfig(params)
+    setLastConfig(p)
     setInitialFormValues(null)
     setLoadingStartTime(Date.now())
 
     try {
-      const { blob, objectUrl } = await generateVideo(params)
+      const { blob, objectUrl } = await generateVideo(p)
       setVideoUrl(objectUrl)
       setVideoBlob(blob)
       setStudioState('success')
@@ -134,13 +140,13 @@ export default function App() {
       const newItem: HistoryItem = {
         id: crypto.randomUUID(),
         createdAt: Date.now(),
-        client: params.client || '',
-        prompt: params.prompt,
+        client: p.client || '',
+        prompt: p.prompt,
         thumbnailUrl: thumbnail,
-        params,
-        model: params.model,
-        resolution: params.resolution,
-        aspectRatio: params.aspectRatio,
+        params: p,
+        model: p.model,
+        resolution: p.resolution,
+        aspectRatio: p.aspectRatio,
       }
       setHistory((prev) => [newItem, ...prev])
 
@@ -148,26 +154,25 @@ export default function App() {
         const videoAsset: AssetItem = {
           id: crypto.randomUUID(),
           type: 'video',
-          name: `VEO_${new Date().toISOString().slice(0, 10)}_${params.client || 'draft'}`,
+          name: `VEO_${new Date().toISOString().slice(0, 10)}_${p.client || 'draft'}`,
           previewUrl: thumbnail,
           mimeType: 'video/mp4',
           createdAt: Date.now(),
           source: 'generated',
-          prompt: params.prompt,
-          client: params.client,
+          prompt: p.prompt,
+          client: p.client,
         }
         setAssets((prev) => [videoAsset, ...prev])
       }
+      addToast('Video generated successfully', 'success')
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'An unknown error occurred'
-      if (msg === 'SESSION_EXPIRED') {
-        handleLogout()
-        return
-      }
+      if (msg === 'SESSION_EXPIRED') { handleLogout(); return }
       setErrorMessage(msg)
       setStudioState('error')
+      addToast(msg, 'error')
     }
-  }, [setHistory, setAssets, handleLogout])
+  }, [setHistory, setAssets, handleLogout, activeClient, addToast])
 
   const handleRetry = useCallback(() => {
     if (lastConfig) handleGenerate(lastConfig)
@@ -215,8 +220,9 @@ export default function App() {
         ...prev,
         { id: crypto.randomUUID(), name, createdAt: Date.now() },
       ])
+      addToast(`Client "${name}" added`, 'success')
     },
-    [setClients]
+    [setClients, addToast]
   )
 
   const handleRemoveClient = useCallback(
@@ -228,21 +234,25 @@ export default function App() {
 
   const handleSaveAsset = useCallback(
     (asset: AssetItem) => {
-      setAssets((prev) => [asset, ...prev])
+      const a = { ...asset, client: asset.client || activeClient }
+      setAssets((prev) => [a, ...prev])
+      addToast('Saved to Assets', 'success')
     },
-    [setAssets]
+    [setAssets, activeClient, addToast]
   )
 
   const handleRemoveAsset = useCallback(
     (id: string) => {
       setAssets((prev) => prev.filter((a) => a.id !== id))
+      addToast('Asset deleted', 'info')
     },
-    [setAssets]
+    [setAssets, addToast]
   )
 
   const handleUseAsPrompt = useCallback((text: string) => {
     setInitialFormValues({
       prompt: text,
+      client: activeClient,
       model: VeoModel.VEO_FAST,
       aspectRatio: AspectRatio.LANDSCAPE,
       resolution: Resolution.P720,
@@ -250,10 +260,18 @@ export default function App() {
     })
     setStudioState('idle')
     setView('studio')
-  }, [])
+    addToast('Prompt loaded in Studio', 'info')
+  }, [activeClient, addToast])
 
   const canExtend = lastConfig?.resolution === Resolution.P720
   const clientNames = clients.map((c) => c.name)
+
+  const filteredHistory = activeClient
+    ? history.filter((h) => h.client === activeClient)
+    : history
+  const filteredAssets = activeClient
+    ? assets.filter((a) => a.client === activeClient)
+    : assets
 
   if (!authChecked) {
     return (
@@ -272,19 +290,24 @@ export default function App() {
     <div className="h-screen flex flex-col bg-obsidian text-ivory font-sans overflow-hidden">
       <div className="noise" />
 
-      <Header status={headerStatus} onLogout={handleLogout} />
+      <Header
+        status={headerStatus}
+        onLogout={handleLogout}
+        clients={clientNames}
+        activeClient={activeClient}
+        onClientChange={setActiveClient}
+      />
 
       <div className="flex flex-1 overflow-hidden">
         <Sidebar
           currentView={view}
           onNavigate={setView}
-          historyCount={history.length}
+          historyCount={filteredHistory.length}
           clientCount={clients.length}
-          assetCount={assets.length}
+          assetCount={filteredAssets.length}
         />
 
         <main className="flex-1 overflow-y-auto relative">
-          {/* Ambient background */}
           <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
             <div className="absolute top-[-30%] left-[-15%] w-[60%] h-[60%] bg-champagne/[0.015] blur-[180px] rounded-full" />
             <div className="absolute bottom-[-30%] right-[-15%] w-[60%] h-[60%] bg-champagne/[0.01] blur-[180px] rounded-full" />
@@ -299,6 +322,7 @@ export default function App() {
                     clients={clientNames}
                     initialValues={initialFormValues}
                     canExtend={canExtend}
+                    activeClient={activeClient}
                   />
                 )}
                 {studioState === 'loading' && (
@@ -322,25 +346,17 @@ export default function App() {
                     <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-error/10 flex items-center justify-center">
                       <span className="text-error text-2xl">!</span>
                     </div>
-                    <h2 className="serif text-xl font-light text-ivory mb-3">
-                      Production Failed
-                    </h2>
+                    <h2 className="serif text-xl font-light text-ivory mb-3">Production Failed</h2>
                     <p className="text-xs text-stone/60 mb-6 leading-relaxed">
                       {errorMessage || 'An unexpected error occurred'}
                     </p>
                     <div className="flex gap-3 justify-center">
                       {lastConfig && (
-                        <button
-                          onClick={handleRetry}
-                          className="px-6 py-2.5 bg-champagne text-obsidian font-semibold text-xs rounded-lg hover:bg-champagne-glow transition-all"
-                        >
+                        <button onClick={handleRetry} className="px-6 py-2.5 bg-champagne text-obsidian font-semibold text-xs rounded-lg hover:bg-champagne-glow transition-all">
                           Retry
                         </button>
                       )}
-                      <button
-                        onClick={handleNewVideo}
-                        className="px-6 py-2.5 bg-white/[0.04] border border-white/[0.08] rounded-lg text-xs text-ivory hover:bg-white/[0.08] transition-all"
-                      >
+                      <button onClick={handleNewVideo} className="px-6 py-2.5 bg-white/[0.04] border border-white/[0.08] rounded-lg text-xs text-ivory hover:bg-white/[0.08] transition-all">
                         Start Over
                       </button>
                     </div>
@@ -350,16 +366,17 @@ export default function App() {
             )}
 
             {view === 'chat' && (
-              <ChatView onUseAsPrompt={handleUseAsPrompt} />
-            )}
-
-            {view === 'imagine' && (
-              <ImagineView onSaveAsset={handleSaveAsset} />
+              <ChatView
+                activeClient={activeClient}
+                onUseAsPrompt={handleUseAsPrompt}
+                onSaveAsset={handleSaveAsset}
+              />
             )}
 
             {view === 'assets' && (
               <AssetsView
                 assets={assets}
+                activeClient={activeClient}
                 onAdd={handleSaveAsset}
                 onRemove={handleRemoveAsset}
               />
@@ -368,7 +385,7 @@ export default function App() {
             {view === 'gallery' && (
               <GalleryView
                 history={history}
-                clients={clientNames}
+                activeClient={activeClient}
                 onLoadConcept={handleLoadConcept}
               />
             )}
@@ -383,6 +400,8 @@ export default function App() {
           </div>
         </main>
       </div>
+
+      <Toast toasts={toasts} onDismiss={dismissToast} />
     </div>
   )
 }
