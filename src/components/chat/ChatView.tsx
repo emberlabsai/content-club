@@ -224,7 +224,7 @@ export default function ChatView({ activeClient, onUseAsPrompt, onSaveAsset }: C
               className="bg-white/[0.03] border border-white/[0.06] rounded-lg px-3 py-1.5 text-xs text-ivory appearance-none hover:border-white/10 transition-all"
             >
               <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-              <option value="gemini-2.5-pro-preview-05-06">Gemini 2.5 Pro</option>
+              <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
               <option value="gemini-3.1-flash-image-preview">Nano Banana 2</option>
             </select>
           </div>

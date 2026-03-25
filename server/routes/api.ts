@@ -117,9 +117,6 @@ router.post('/chat', async (req: Request, res: Response) => {
 
     if (isImageModel) {
       config.responseModalities = ['Text', 'Image']
-      config.imageConfig = {
-        personGeneration: 'ALLOW_ALL',
-      }
     }
 
     const response = await ai.models.generateContent({
