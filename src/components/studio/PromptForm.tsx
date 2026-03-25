@@ -156,6 +156,10 @@ export default function PromptForm({
       setAspectRatio(AspectRatio.LANDSCAPE)
       setResolution(Resolution.P720)
     }
+    if (mode === GenerationMode.INGREDIENTS) {
+      setModel(VeoModel.VEO)
+      setResolution(Resolution.P1080)
+    }
   }, [mode])
 
   useEffect(() => {
@@ -210,11 +214,15 @@ export default function PromptForm({
 
   const isExtend = mode === GenerationMode.EXTEND_VIDEO
   const isRef = mode === GenerationMode.REFERENCES_TO_VIDEO
+  const isIngredients = mode === GenerationMode.INGREDIENTS
+  const lockedModel = isRef || isIngredients
+  const lockedRes = isExtend || isRef || isIngredients
 
   let isDisabled = false
   if (mode === GenerationMode.TEXT_TO_VIDEO) isDisabled = !prompt.trim()
   if (mode === GenerationMode.FRAMES_TO_VIDEO) isDisabled = !startFrame
   if (mode === GenerationMode.REFERENCES_TO_VIDEO) isDisabled = !prompt.trim() || referenceImages.length === 0
+  if (mode === GenerationMode.INGREDIENTS) isDisabled = !prompt.trim() || !startFrame
   if (mode === GenerationMode.EXTEND_VIDEO) isDisabled = true
 
   const totalRefs = referenceImages.length + (styleImage ? 1 : 0)
@@ -240,27 +248,32 @@ export default function PromptForm({
       {/* Mode Description */}
       <p className="text-xs text-stone/60 text-center mb-6">{MODE_DESCRIPTIONS[mode]}</p>
 
-      {/* Media Uploads */}
+      {/* === FRAMES MODE === */}
       {mode === GenerationMode.FRAMES_TO_VIDEO && (
         <div className="mb-6 p-6 bg-white/[0.02] border border-white/[0.06] rounded-xl flex flex-col items-center gap-4 animate-fade-in">
           <div className="flex items-center gap-6">
-            <ImageUpload
-              image={startFrame}
-              onSelect={setStartFrame}
-              onRemove={() => { setStartFrame(null); setIsLooping(false) }}
-              label="Start"
-            />
-            {!isLooping && (
+            <div className="flex flex-col items-center gap-1">
               <ImageUpload
-                image={endFrame}
-                onSelect={setEndFrame}
-                onRemove={() => setEndFrame(null)}
-                label="End"
+                image={startFrame}
+                onSelect={setStartFrame}
+                onRemove={() => { setStartFrame(null); setIsLooping(false) }}
+                label="Start Frame"
               />
+            </div>
+            <span className="text-stone/20 text-lg">&rarr;</span>
+            {!isLooping && (
+              <div className="flex flex-col items-center gap-1">
+                <ImageUpload
+                  image={endFrame}
+                  onSelect={setEndFrame}
+                  onRemove={() => setEndFrame(null)}
+                  label="End Frame"
+                />
+              </div>
             )}
           </div>
-          <p className="text-[10px] text-stone/40 italic">At least a start frame is required</p>
-          <p className="text-[10px] text-amber-500/60 italic max-w-sm text-center">Note: VEO may reject images containing human faces (even AI-generated ones) due to Google's celebrity detection filter. Use Text-to-Video for content with people.</p>
+          <p className="text-[10px] text-stone/40 italic">At least a start frame is required. End frame constrains the final composition.</p>
+          <p className="text-[10px] text-amber-500/60 italic max-w-sm text-center">Note: VEO may reject images containing human faces due to Google's celebrity detection filter.</p>
           {startFrame && !endFrame && (
             <label className="flex items-center gap-2 cursor-pointer">
               <input
@@ -275,9 +288,10 @@ export default function PromptForm({
         </div>
       )}
 
+      {/* === REFERENCES MODE === */}
       {mode === GenerationMode.REFERENCES_TO_VIDEO && (
         <div className="mb-6 p-6 bg-white/[0.02] border border-white/[0.06] rounded-xl flex flex-col items-center gap-4 animate-fade-in">
-          <span className="text-micro text-stone/60">References ({referenceImages.length}/3)</span>
+          <span className="text-micro text-stone/60">Reference Assets ({referenceImages.length}/3)</span>
           <div className="flex flex-wrap items-center justify-center gap-3">
             {referenceImages.map((img, i) => (
               <ImageUpload
@@ -291,11 +305,78 @@ export default function PromptForm({
             {totalRefs < 3 && (
               <ImageUpload
                 onSelect={(img) => setReferenceImages((prev) => [...prev, img])}
-                label="Add"
+                label="Add Asset"
               />
             )}
           </div>
-          <p className="text-[10px] text-amber-500/60 italic max-w-sm text-center">Tip: Use product/environment/style references. Images with human faces may be rejected by Google's celebrity filter.</p>
+          <p className="text-[10px] text-amber-500/60 italic max-w-sm text-center">Use product, environment, or style references. Images with faces may be rejected.</p>
+        </div>
+      )}
+
+      {/* === INGREDIENTS MODE (combined) === */}
+      {mode === GenerationMode.INGREDIENTS && (
+        <div className="mb-6 space-y-4 animate-fade-in">
+          {/* Frames Row */}
+          <div className="p-5 bg-white/[0.02] border border-white/[0.06] rounded-xl">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-micro text-champagne/60">Frames</span>
+              <span className="text-[9px] text-stone/30">(interpolation start &rarr; end)</span>
+            </div>
+            <div className="flex items-center gap-6 justify-center">
+              <div className="flex flex-col items-center gap-1">
+                <ImageUpload
+                  image={startFrame}
+                  onSelect={setStartFrame}
+                  onRemove={() => setStartFrame(null)}
+                  label="Start Frame"
+                />
+                <span className="text-[8px] text-stone/30 uppercase">Required</span>
+              </div>
+              <span className="text-stone/20 text-lg">&rarr;</span>
+              <div className="flex flex-col items-center gap-1">
+                <ImageUpload
+                  image={endFrame}
+                  onSelect={setEndFrame}
+                  onRemove={() => setEndFrame(null)}
+                  label="End Frame"
+                />
+                <span className="text-[8px] text-stone/30 uppercase">Final Pose</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Reference Assets Row */}
+          <div className="p-5 bg-white/[0.02] border border-white/[0.06] rounded-xl">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-micro text-champagne/60">Reference Assets</span>
+              <span className="text-[9px] text-stone/30">(identity, product, style — up to 3)</span>
+            </div>
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              {referenceImages.map((img, i) => (
+                <ImageUpload
+                  key={i}
+                  image={img}
+                  onSelect={() => {}}
+                  onRemove={() => setReferenceImages((prev) => prev.filter((_, idx) => idx !== i))}
+                  label=""
+                />
+              ))}
+              {referenceImages.length < 3 && (
+                <ImageUpload
+                  onSelect={(img) => setReferenceImages((prev) => [...prev, img])}
+                  label="Add Asset"
+                />
+              )}
+            </div>
+            <p className="text-[10px] text-stone/30 text-center mt-3 italic">
+              Use for character identity, product consistency, or style reference
+            </p>
+          </div>
+
+          <p className="text-[10px] text-amber-500/60 italic max-w-md text-center mx-auto">
+            Ingredients mode combines frames + references + prompt into one generation.
+            Uses Veo 3.1 Pro at 1080p/8s automatically. Images with faces may be rejected.
+          </p>
         </div>
       )}
 
@@ -313,10 +394,12 @@ export default function PromptForm({
                   ? 'Describe the motion between frames (optional)...'
                   : mode === GenerationMode.REFERENCES_TO_VIDEO
                     ? 'Describe the video using your references...'
-                    : 'Describe what happens next (optional)...'
+                    : mode === GenerationMode.INGREDIENTS
+                      ? 'Detailed narrative prompt — describe the transformation, camera, lighting, audio...'
+                      : 'Describe what happens next (optional)...'
             }
             className="w-full bg-transparent text-ivory text-sm placeholder-stone/30 resize-none min-h-[80px] max-h-[200px] leading-relaxed"
-            rows={3}
+            rows={mode === GenerationMode.INGREDIENTS ? 5 : 3}
           />
           <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/[0.04]">
             <div className="flex items-center gap-2">
@@ -333,18 +416,20 @@ export default function PromptForm({
                 <WandIcon className="w-3 h-3" />
                 {isRefining ? 'Refining...' : 'Refine'}
               </button>
-              <button
-                type="button"
-                onClick={() => setShowTemplates(!showTemplates)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs transition-all duration-300 ${
-                  showTemplates
-                    ? 'bg-champagne/10 text-champagne'
-                    : 'text-stone hover:text-champagne hover:bg-champagne/5'
-                }`}
-              >
-                <SparklesIcon className="w-3 h-3" />
-                Templates
-              </button>
+              {mode === GenerationMode.TEXT_TO_VIDEO && (
+                <button
+                  type="button"
+                  onClick={() => setShowTemplates(!showTemplates)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs transition-all duration-300 ${
+                    showTemplates
+                      ? 'bg-champagne/10 text-champagne'
+                      : 'text-stone hover:text-champagne hover:bg-champagne/5'
+                  }`}
+                >
+                  <SparklesIcon className="w-3 h-3" />
+                  Templates
+                </button>
+              )}
             </div>
             <button
               type="submit"
@@ -392,7 +477,7 @@ export default function PromptForm({
             <select
               value={model}
               onChange={(e) => setModel(e.target.value as VeoModel)}
-              disabled={isRef}
+              disabled={lockedModel}
               className="w-full bg-white/[0.03] border border-white/[0.06] rounded-lg pl-9 pr-8 py-2.5 text-xs text-ivory appearance-none disabled:opacity-40 hover:border-white/10 transition-all"
             >
               <option value={VeoModel.VEO_FAST}>Veo 3.1 Fast</option>
@@ -400,6 +485,9 @@ export default function PromptForm({
             </select>
             <ChevronDownIcon className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-stone/30 pointer-events-none" />
           </div>
+          {lockedModel && (
+            <p className="text-[9px] text-champagne/40 mt-1">Locked to Pro for this mode</p>
+          )}
         </div>
 
         <div>
@@ -426,7 +514,7 @@ export default function PromptForm({
             <select
               value={resolution}
               onChange={(e) => setResolution(e.target.value as Resolution)}
-              disabled={isExtend || isRef}
+              disabled={lockedRes}
               className="w-full bg-white/[0.03] border border-white/[0.06] rounded-lg pl-9 pr-8 py-2.5 text-xs text-ivory appearance-none disabled:opacity-40 hover:border-white/10 transition-all"
             >
               <option value={Resolution.P720}>720p</option>
@@ -434,8 +522,8 @@ export default function PromptForm({
             </select>
             <ChevronDownIcon className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-stone/30 pointer-events-none" />
           </div>
-          {resolution === Resolution.P1080 && !isExtend && !isRef && (
-            <p className="text-[9px] text-champagne/50 mt-1">1080p videos cannot be extended</p>
+          {isIngredients && (
+            <p className="text-[9px] text-champagne/40 mt-1">1080p / 8s for Ingredients</p>
           )}
         </div>
       </div>
