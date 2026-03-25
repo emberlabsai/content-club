@@ -26,6 +26,15 @@ import {
   Camera,
   Clapperboard,
   Maximize2,
+  MessageCircle,
+  ImagePlus,
+  FolderOpen,
+  Send,
+  Copy,
+  LogOut,
+  Lock,
+  Upload,
+  Trash2,
 } from 'lucide-react'
 import type { LucideProps } from 'lucide-react'
 
@@ -58,3 +67,12 @@ export const PaletteIcon = (p: LucideProps) => <Palette {...d} {...p} />
 export const CameraIcon = (p: LucideProps) => <Camera {...d} {...p} />
 export const ClapperboardIcon = (p: LucideProps) => <Clapperboard {...d} {...p} />
 export const MaximizeIcon = (p: LucideProps) => <Maximize2 {...d} {...p} />
+export const ChatIcon = (p: LucideProps) => <MessageCircle {...d} {...p} />
+export const ImagePlusIcon = (p: LucideProps) => <ImagePlus {...d} {...p} />
+export const FolderOpenIcon = (p: LucideProps) => <FolderOpen {...d} {...p} />
+export const SendIcon = (p: LucideProps) => <Send {...d} {...p} />
+export const CopyIcon = (p: LucideProps) => <Copy {...d} {...p} />
+export const LogOutIcon = (p: LucideProps) => <LogOut {...d} {...p} />
+export const LockIcon = (p: LucideProps) => <Lock {...d} {...p} />
+export const UploadIcon = (p: LucideProps) => <Upload {...d} {...p} />
+export const TrashIcon = (p: LucideProps) => <Trash2 {...d} {...p} />

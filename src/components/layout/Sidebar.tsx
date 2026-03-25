@@ -1,28 +1,46 @@
 import type { AppView } from '../../types'
-import { ClapperboardIcon, LayoutGridIcon, UsersIcon } from '../common/Icons'
+import {
+  ClapperboardIcon,
+  LayoutGridIcon,
+  UsersIcon,
+  ChatIcon,
+  ImagePlusIcon,
+  FolderOpenIcon,
+} from '../common/Icons'
 
 interface SidebarProps {
   currentView: AppView
   onNavigate: (view: AppView) => void
   historyCount: number
   clientCount: number
+  assetCount: number
 }
 
 const navItems: { view: AppView; label: string; icon: typeof ClapperboardIcon }[] = [
   { view: 'studio', label: 'Studio', icon: ClapperboardIcon },
+  { view: 'chat', label: 'Chat', icon: ChatIcon },
+  { view: 'imagine', label: 'Imagine', icon: ImagePlusIcon },
+  { view: 'assets', label: 'Assets', icon: FolderOpenIcon },
   { view: 'gallery', label: 'Gallery', icon: LayoutGridIcon },
   { view: 'clients', label: 'Clients', icon: UsersIcon },
 ]
 
-export default function Sidebar({ currentView, onNavigate, historyCount, clientCount }: SidebarProps) {
+export default function Sidebar({
+  currentView,
+  onNavigate,
+  historyCount,
+  clientCount,
+  assetCount,
+}: SidebarProps) {
   const getCount = (view: AppView) => {
     if (view === 'gallery') return historyCount
     if (view === 'clients') return clientCount
+    if (view === 'assets') return assetCount
     return 0
   }
 
   return (
-    <aside className="w-[72px] border-r border-white/[0.06] flex flex-col items-center py-6 gap-2 shrink-0">
+    <aside className="w-[72px] border-r border-white/[0.06] flex flex-col items-center py-6 gap-1 shrink-0">
       {navItems.map(({ view, label, icon: Icon }) => {
         const isActive = currentView === view
         const count = getCount(view)
@@ -37,7 +55,7 @@ export default function Sidebar({ currentView, onNavigate, historyCount, clientC
             }`}
           >
             <Icon className="w-[18px] h-[18px]" />
-            <span className="text-[8px] uppercase tracking-wider mt-1 font-medium">
+            <span className="text-[7px] uppercase tracking-wider mt-0.5 font-medium">
               {label}
             </span>
             {count > 0 && (

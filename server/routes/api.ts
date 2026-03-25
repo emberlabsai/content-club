@@ -13,6 +13,8 @@ function getAI(): GoogleGenAI {
   return new GoogleGenAI({ apiKey: key })
 }
 
+// ─── Prompt Refinement ───────────────────────────────────────────────
+
 router.post('/refine-prompt', async (req: Request, res: Response) => {
   try {
     const { prompt } = req.body
@@ -50,6 +52,103 @@ Return ONLY the refined prompt text. No explanations, quotes, or conversational 
     res.status(500).json({ error: message })
   }
 })
+
+// ─── Gemini Chat ─────────────────────────────────────────────────────
+
+router.post('/chat', async (req: Request, res: Response) => {
+  try {
+    const { messages, model } = req.body
+    if (!messages?.length) {
+      res.status(400).json({ error: 'Messages are required' })
+      return
+    }
+
+    const ai = getAI()
+    const chatModel = model || 'gemini-2.5-flash'
+
+    const systemPrompt = `You are Tiffany's creative AI assistant, specializing in high-end fashion content creation, video production, and luxury brand marketing.
+
+You help with:
+- Crafting compelling video prompts for VEO 3.1 video generation
+- Brainstorming creative concepts for fashion brands
+- Writing image generation prompts for Imagen 3
+- Advising on visual aesthetics, lighting, camera angles, and styling
+- Content strategy for luxury fashion brands like JLUXLABEL
+
+Be creative, knowledgeable about fashion, and always aim for elevated, editorial quality. Keep responses concise but rich with actionable creative direction.`
+
+    const formattedContents: any[] = [
+      { role: 'user', parts: [{ text: `[System] ${systemPrompt}` }] },
+      { role: 'model', parts: [{ text: 'Understood. I\'m ready to help you create elevated fashion content. What would you like to work on?' }] },
+    ]
+
+    for (const m of messages) {
+      formattedContents.push({
+        role: m.role === 'user' ? 'user' : 'model',
+        parts: [{ text: m.content }],
+      })
+    }
+
+    const response = await ai.models.generateContent({
+      model: chatModel,
+      contents: formattedContents,
+    })
+
+    res.json({ response: response.text?.trim() || '' })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Chat failed'
+    console.error('[chat]', message)
+    res.status(500).json({ error: message })
+  }
+})
+
+// ─── Image Generation (Imagen 3) ────────────────────────────────────
+
+router.post('/generate-image', async (req: Request, res: Response) => {
+  try {
+    const { prompt, aspectRatio, numberOfImages } = req.body
+    if (!prompt?.trim()) {
+      res.status(400).json({ error: 'Prompt is required' })
+      return
+    }
+
+    const ai = getAI()
+
+    console.log('[generate-image] Generating with Imagen 3...')
+    const response = await ai.models.generateImages({
+      model: 'imagen-3.0-generate-002',
+      prompt,
+      config: {
+        numberOfImages: numberOfImages || 1,
+        aspectRatio: aspectRatio || '16:9',
+      },
+    })
+
+    const images = response.generatedImages
+    if (!images?.length) {
+      throw new Error('No images were generated')
+    }
+
+    const results = images.map((img: any) => {
+      const imageData = img.image
+      if (!imageData?.imageBytes) {
+        throw new Error('Generated image has no data')
+      }
+      return {
+        base64: imageData.imageBytes,
+        mimeType: imageData.mimeType || 'image/png',
+      }
+    })
+
+    res.json({ images: results })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Image generation failed'
+    console.error('[generate-image]', message)
+    res.status(500).json({ error: message })
+  }
+})
+
+// ─── Video Generation (VEO 3.1) ─────────────────────────────────────
 
 router.post('/generate-video', async (req: Request, res: Response) => {
   try {

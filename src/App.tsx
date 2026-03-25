@@ -1,16 +1,18 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import {
   type AppView,
   type GenerateVideoParams,
   type HistoryItem,
   type ClientProfile,
+  type AssetItem,
   Resolution,
   GenerationMode,
   AspectRatio,
   VeoModel,
 } from './types'
-import { generateVideo } from './api/client'
+import { generateVideo, login as apiLogin, verifyToken } from './api/client'
 import { useLocalStorage } from './hooks/useLocalStorage'
+import LoginScreen from './components/auth/LoginScreen'
 import Header from './components/layout/Header'
 import Sidebar from './components/layout/Sidebar'
 import PromptForm from './components/studio/PromptForm'
@@ -18,10 +20,17 @@ import LoadingState from './components/studio/LoadingState'
 import VideoResult from './components/studio/VideoResult'
 import GalleryView from './components/gallery/GalleryView'
 import ClientsView from './components/clients/ClientsView'
+import ChatView from './components/chat/ChatView'
+import ImagineView from './components/imagine/ImagineView'
+import AssetsView from './components/assets/AssetsView'
 
 type StudioState = 'idle' | 'loading' | 'success' | 'error'
 
 export default function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [authChecked, setAuthChecked] = useState(false)
+  const [loginError, setLoginError] = useState<string | null>(null)
+
   const [view, setView] = useState<AppView>('studio')
   const [studioState, setStudioState] = useState<StudioState>('idle')
   const [videoUrl, setVideoUrl] = useState<string | null>(null)
@@ -35,6 +44,37 @@ export default function App() {
   const [clients, setClients] = useLocalStorage<ClientProfile[]>('tcc-clients', [
     { id: 'jluxlabel', name: 'JLUXLABEL', createdAt: Date.now() },
   ])
+  const [assets, setAssets] = useLocalStorage<AssetItem[]>('tcc-assets', [])
+
+  useEffect(() => {
+    const token = localStorage.getItem('tcc-auth-token')
+    if (token) {
+      verifyToken().then((valid) => {
+        setIsAuthenticated(valid)
+        setAuthChecked(true)
+      })
+    } else {
+      setAuthChecked(true)
+    }
+  }, [])
+
+  const handleLogin = useCallback(async (username: string, password: string) => {
+    setLoginError(null)
+    try {
+      const token = await apiLogin(username, password)
+      localStorage.setItem('tcc-auth-token', token)
+      setIsAuthenticated(true)
+    } catch (err) {
+      setLoginError(err instanceof Error ? err.message : 'Login failed')
+    }
+  }, [])
+
+  const handleLogout = useCallback(() => {
+    localStorage.removeItem('tcc-auth-token')
+    setIsAuthenticated(false)
+    setView('studio')
+    setStudioState('idle')
+  }, [])
 
   const headerStatus =
     studioState === 'loading'
@@ -103,12 +143,31 @@ export default function App() {
         aspectRatio: params.aspectRatio,
       }
       setHistory((prev) => [newItem, ...prev])
+
+      if (thumbnail) {
+        const videoAsset: AssetItem = {
+          id: crypto.randomUUID(),
+          type: 'video',
+          name: `VEO_${new Date().toISOString().slice(0, 10)}_${params.client || 'draft'}`,
+          previewUrl: thumbnail,
+          mimeType: 'video/mp4',
+          createdAt: Date.now(),
+          source: 'generated',
+          prompt: params.prompt,
+          client: params.client,
+        }
+        setAssets((prev) => [videoAsset, ...prev])
+      }
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'An unknown error occurred'
+      if (msg === 'SESSION_EXPIRED') {
+        handleLogout()
+        return
+      }
       setErrorMessage(msg)
       setStudioState('error')
     }
-  }, [setHistory])
+  }, [setHistory, setAssets, handleLogout])
 
   const handleRetry = useCallback(() => {
     if (lastConfig) handleGenerate(lastConfig)
@@ -167,15 +226,53 @@ export default function App() {
     [setClients]
   )
 
-  const canExtend = lastConfig?.resolution === Resolution.P720
+  const handleSaveAsset = useCallback(
+    (asset: AssetItem) => {
+      setAssets((prev) => [asset, ...prev])
+    },
+    [setAssets]
+  )
 
+  const handleRemoveAsset = useCallback(
+    (id: string) => {
+      setAssets((prev) => prev.filter((a) => a.id !== id))
+    },
+    [setAssets]
+  )
+
+  const handleUseAsPrompt = useCallback((text: string) => {
+    setInitialFormValues({
+      prompt: text,
+      model: VeoModel.VEO_FAST,
+      aspectRatio: AspectRatio.LANDSCAPE,
+      resolution: Resolution.P720,
+      mode: GenerationMode.TEXT_TO_VIDEO,
+    })
+    setStudioState('idle')
+    setView('studio')
+  }, [])
+
+  const canExtend = lastConfig?.resolution === Resolution.P720
   const clientNames = clients.map((c) => c.name)
+
+  if (!authChecked) {
+    return (
+      <div className="min-h-screen bg-obsidian flex items-center justify-center">
+        <div className="noise" />
+        <div className="animate-pulse-gold text-champagne text-2xl">✦</div>
+      </div>
+    )
+  }
+
+  if (!isAuthenticated) {
+    return <LoginScreen onLogin={handleLogin} error={loginError} />
+  }
 
   return (
     <div className="h-screen flex flex-col bg-obsidian text-ivory font-sans overflow-hidden">
       <div className="noise" />
 
-      <Header status={headerStatus} />
+      <Header status={headerStatus} onLogout={handleLogout} />
 
       <div className="flex flex-1 overflow-hidden">
         <Sidebar
@@ -183,6 +280,7 @@ export default function App() {
           onNavigate={setView}
           historyCount={history.length}
           clientCount={clients.length}
+          assetCount={assets.length}
         />
 
         <main className="flex-1 overflow-y-auto relative">
@@ -249,6 +347,22 @@ export default function App() {
                   </div>
                 )}
               </div>
+            )}
+
+            {view === 'chat' && (
+              <ChatView onUseAsPrompt={handleUseAsPrompt} />
+            )}
+
+            {view === 'imagine' && (
+              <ImagineView onSaveAsset={handleSaveAsset} />
+            )}
+
+            {view === 'assets' && (
+              <AssetsView
+                assets={assets}
+                onAdd={handleSaveAsset}
+                onRemove={handleRemoveAsset}
+              />
             )}
 
             {view === 'gallery' && (
