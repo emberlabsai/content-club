@@ -169,21 +169,29 @@ export default function VideoResult({
       {/* Actions */}
       <div className="mt-8 flex flex-wrap justify-center gap-3">
         <button
-          onClick={onRetry}
-          className="flex items-center gap-2 px-6 py-2.5 bg-white/[0.04] border border-white/[0.08] rounded-lg text-xs text-ivory hover:bg-white/[0.08] transition-all"
+          onClick={onNewVideo}
+          className="flex items-center gap-2 px-6 py-2.5 bg-champagne text-obsidian font-semibold rounded-lg text-xs hover:bg-champagne-glow transition-all"
         >
-          <RefreshIcon className="w-3.5 h-3.5 text-stone" />
-          Retry
+          <PlusIcon className="w-3.5 h-3.5" />
+          Create New
         </button>
 
         <a
           href={videoUrl}
           download={`tiffanys-content-club-${Date.now()}.mp4`}
-          className="flex items-center gap-2 px-6 py-2.5 bg-champagne text-obsidian font-semibold rounded-lg text-xs hover:bg-champagne-glow transition-all"
+          className="flex items-center gap-2 px-6 py-2.5 bg-white/[0.04] border border-white/[0.08] rounded-lg text-xs text-ivory hover:bg-white/[0.08] transition-all"
         >
-          <DownloadIcon className="w-3.5 h-3.5" />
+          <DownloadIcon className="w-3.5 h-3.5 text-stone" />
           Export MP4
         </a>
+
+        <button
+          onClick={onRetry}
+          className="flex items-center gap-2 px-6 py-2.5 bg-white/[0.04] border border-white/[0.08] rounded-lg text-xs text-ivory hover:bg-white/[0.08] transition-all"
+        >
+          <RefreshIcon className="w-3.5 h-3.5 text-stone" />
+          Retry Same
+        </button>
 
         <button
           onClick={handleDownloadGif}

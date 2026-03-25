@@ -33,7 +33,7 @@ You help with:
 
 Be creative, knowledgeable about fashion, and always aim for elevated, editorial quality. Keep responses concise but rich with actionable creative direction. When generating images, focus on high-end fashion aesthetics.`
 
-// ─── Prompt Refinement ───────────────────────────────────────────────
+// ─── Prompt Refinement (manual, user-triggered only) ─────────────────
 
 router.post('/refine-prompt', async (req: Request, res: Response) => {
   try {
@@ -80,7 +80,7 @@ Return ONLY the refined prompt text. No explanations, quotes, or conversational 
 
 router.post('/chat', async (req: Request, res: Response) => {
   try {
-    const { messages, model, imageAttachments } = req.body
+    const { messages, model } = req.body
     if (!messages?.length) {
       res.status(400).json({ error: 'Messages are required' })
       return
@@ -93,17 +93,29 @@ router.post('/chat', async (req: Request, res: Response) => {
     const formattedContents: any[] = []
     for (const m of messages) {
       const parts: any[] = []
-      if (m.content) {
-        parts.push({ text: m.content })
+
+      if (m.role === 'model' || m.role === 'assistant') {
+        if (m.content) {
+          parts.push({ text: m.content })
+        }
+      } else {
+        if (m.content) {
+          parts.push({ text: m.content })
+        }
+        if (m.imageData) {
+          parts.push({
+            inlineData: {
+              data: m.imageData.base64,
+              mimeType: m.imageData.mimeType,
+            },
+          })
+        }
       }
-      if (m.imageData) {
-        parts.push({
-          inlineData: {
-            data: m.imageData.base64,
-            mimeType: m.imageData.mimeType,
-          },
-        })
+
+      if (parts.length === 0) {
+        parts.push({ text: '.' })
       }
+
       formattedContents.push({
         role: m.role === 'user' ? 'user' : 'model',
         parts,
@@ -173,34 +185,7 @@ router.post('/generate-video', async (req: Request, res: Response) => {
     } = req.body
 
     const ai = getAI()
-
-    const skipRefinement = req.body.skipRefinement
-    let finalPrompt = prompt || ''
-    if (finalPrompt && mode !== 'Extend Video' && !skipRefinement) {
-      try {
-        const refineRes = await ai.models.generateContent({
-          model: 'gemini-2.5-flash',
-          contents: `You are an expert video prompt engineer for Veo 3.1. Enhance this prompt for optimal video generation.
-
-RULES:
-- Do NOT change the core meaning or subject
-- Add camera movements, lighting, and atmosphere
-- Keep the prompt concise (under 200 words)
-- Do NOT add any content that could trigger safety filters
-- Do NOT mention violence, weapons, or controversial themes
-- Focus on cinematic and artistic quality
-
-Original: "${finalPrompt}"
-
-Return ONLY the refined prompt text.`,
-          config: { safetySettings: PERMISSIVE_SAFETY },
-        })
-        finalPrompt = refineRes.text?.trim() || finalPrompt
-        console.log('[generate-video] Auto-refined prompt successfully')
-      } catch (refineErr) {
-        console.warn('[generate-video] Auto-refinement failed, using original prompt:', refineErr)
-      }
-    }
+    const finalPrompt = prompt || ''
 
     const useImageInput = mode === 'Frames to Video' || mode === 'References to Video'
     const config: Record<string, unknown> = {
@@ -267,9 +252,8 @@ Return ONLY the refined prompt text.`,
       payload.video = inputVideo
     }
 
-    console.log('[generate-video] Submitting generation request...')
     console.log('[generate-video] Model:', model, '| Mode:', mode, '| Resolution:', resolution)
-    console.log('[generate-video] Refined prompt:', finalPrompt?.slice(0, 200))
+    console.log('[generate-video] Prompt:', finalPrompt?.slice(0, 200))
     let operation = await ai.models.generateVideos(payload as any)
 
     let pollCount = 0
@@ -280,39 +264,29 @@ Return ONLY the refined prompt text.`,
       operation = await ai.operations.getVideosOperation({ operation })
     }
 
-    console.log('[generate-video] Operation complete after', pollCount * 10, 'seconds')
+    console.log('[generate-video] Done after', pollCount * 10, 'seconds')
 
     if (operation.error) {
       const errMsg = typeof operation.error === 'object' && operation.error !== null && 'message' in operation.error
         ? String((operation.error as { message?: unknown }).message)
         : 'Video generation failed'
-      console.error('[generate-video] Operation error:', JSON.stringify(operation.error))
+      console.error('[generate-video] Error:', JSON.stringify(operation.error))
       throw new Error(errMsg)
     }
 
     const videos = operation.response?.generatedVideos
     if (!videos?.length) {
       const fullResponse = JSON.stringify(operation.response, null, 2)
-      console.error('[generate-video] No videos in response:', fullResponse)
+      console.error('[generate-video] No videos:', fullResponse)
 
       const responseStr = fullResponse.toLowerCase()
       if (responseStr.includes('celebrity') || responseStr.includes('likeness')) {
         throw new Error(
-          'VEO\'s face detection flagged your input images as containing "celebrity likenesses." ' +
-          'This is a known Google false positive — it happens even with AI-generated faces. ' +
-          'Workaround: use Text-to-Video mode instead and describe the person in your prompt. ' +
-          'Image-based modes (Frames/References) trigger this filter on any human face.'
+          'VEO flagged input images as "celebrity likenesses" (known Google false positive with any human face). ' +
+          'Use Text-to-Video mode instead — describe the person in your prompt.'
         )
       }
-
-      const filterInfo = (operation.response as any)?.raiMediaFilteredReasons
-        || (operation.response as any)?.filteredReasons
-        || (operation.response as any)?.blockReason
-      if (filterInfo) {
-        throw new Error(`Content filter blocked this generation: ${JSON.stringify(filterInfo)}. Try rephrasing your prompt.`)
-      }
-
-      throw new Error('No videos were generated. The content may have been filtered. Try Text-to-Video mode or rephrase your prompt.')
+      throw new Error('No videos generated. Try Text-to-Video mode or rephrase your prompt.')
     }
 
     const videoObj = videos[0].video

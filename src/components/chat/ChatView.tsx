@@ -101,12 +101,16 @@ export default function ChatView({ activeClient, onUseAsPrompt, onSaveAsset }: C
     setIsLoading(true)
 
     try {
-      const apiMessages = [...messages, userMsg].map((m) => {
+      const allMsgs = [...messages, userMsg]
+      const apiMessages = allMsgs.map((m, idx) => {
         const textContent = m.parts.filter(p => p.type === 'text').map(p => p.content).join('\n')
-        const imgPart = m.parts.find(p => p.type === 'image' && p.base64)
+        const isLastUserMsg = idx === allMsgs.length - 1 && m.role === 'user'
+        const imgPart = isLastUserMsg
+          ? m.parts.find(p => p.type === 'image' && p.base64)
+          : undefined
         return {
           role: m.role,
-          content: textContent,
+          content: textContent || '.',
           imageData: imgPart ? { base64: imgPart.base64!, mimeType: imgPart.mimeType! } : undefined,
         }
       })
